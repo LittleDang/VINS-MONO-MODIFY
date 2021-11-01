@@ -1,17 +1,16 @@
-#include <stdio.h>
-#include <queue>
-#include <map>
-#include <thread>
-#include <mutex>
 #include <condition_variable>
-#include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
+#include <map>
+#include <mutex>
 #include <opencv2/opencv.hpp>
+#include <queue>
+#include <ros/ros.h>
+#include <stdio.h>
+#include <thread>
 
 #include "estimator.h"
 #include "parameters.h"
 #include "utility/visualization.h"
-
 
 Estimator estimator;
 
@@ -92,7 +91,6 @@ void update()
     queue<sensor_msgs::ImuConstPtr> tmp_imu_buf = imu_buf;
     for (sensor_msgs::ImuConstPtr tmp_imu_msg; !tmp_imu_buf.empty(); tmp_imu_buf.pop())
         predict(tmp_imu_buf.front());
-
 }
 
 std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>>
@@ -161,7 +159,6 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
     }
 }
 
-
 void feature_callback(const sensor_msgs::PointCloudConstPtr &feature_msg)
 {
     if (!init_feature)
@@ -182,9 +179,9 @@ void restart_callback(const std_msgs::BoolConstPtr &restart_msg)
     {
         ROS_WARN("restart the estimator!");
         m_buf.lock();
-        while(!feature_buf.empty())
+        while (!feature_buf.empty())
             feature_buf.pop();
-        while(!imu_buf.empty())
+        while (!imu_buf.empty())
             imu_buf.pop();
         m_buf.unlock();
         m_estimator.lock();
@@ -213,9 +210,7 @@ void process()
         std::vector<std::pair<std::vector<sensor_msgs::ImuConstPtr>, sensor_msgs::PointCloudConstPtr>> measurements;
         std::unique_lock<std::mutex> lk(m_buf);
         con.wait(lk, [&]
-                 {
-            return (measurements = getMeasurements()).size() != 0;
-                 });
+                 { return (measurements = getMeasurements()).size() != 0; });
         lk.unlock();
         m_estimator.lock();
         for (auto &measurement : measurements)
@@ -227,7 +222,7 @@ void process()
                 double t = imu_msg->header.stamp.toSec();
                 double img_t = img_msg->header.stamp.toSec() + estimator.td;
                 if (t <= img_t)
-                { 
+                {
                     if (current_time < 0)
                         current_time = t;
                     double dt = t - current_time;
@@ -241,7 +236,6 @@ void process()
                     rz = imu_msg->angular_velocity.z;
                     estimator.processIMU(dt, Vector3d(dx, dy, dz), Vector3d(rx, ry, rz));
                     //printf("imu: dt:%f a: %f %f %f w: %f %f %f\n",dt, dx, dy, dz, rx, ry, rz);
-
                 }
                 else
                 {
@@ -309,7 +303,7 @@ void process()
                 ROS_ASSERT(z == 1);
                 Eigen::Matrix<double, 7, 1> xyz_uv_velocity;
                 xyz_uv_velocity << x, y, z, p_u, p_v, velocity_x, velocity_y;
-                image[feature_id].emplace_back(camera_id,  xyz_uv_velocity);
+                image[feature_id].emplace_back(camera_id, xyz_uv_velocity);
             }
             estimator.processImage(image, img_msg->header);
 
@@ -342,7 +336,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "vins_estimator");
     ros::NodeHandle n("~");
-    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
+    ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Debug);
     readParameters(n);
     estimator.setParameter();
 #ifdef EIGEN_DONT_PARALLELIZE
