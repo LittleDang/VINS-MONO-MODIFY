@@ -1,9 +1,13 @@
 %YAML:1.0
 
 #common parameters
-imu_topic: "/camera/imu/data_raw"
+# imu_topic: "/camera/imu/data_raw"
+# image_topic: "/camera/color/image_raw"
+# output_path: "/home/tony-ws1/output/"
+
+imu_topic: "/camera/imu"
 image_topic: "/camera/color/image_raw"
-output_path: "/home/tony-ws1/output/"
+output_path: "/tmp/output/"
 
 #camera calibration 
 model_type: PINHOLE
@@ -66,7 +70,7 @@ g_norm: 9.805       # gravity magnitude
 loop_closure: 1                    # start loop closure
 fast_relocalization: 1             # useful in real-time and large project
 load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
-pose_graph_save_path: "/home/tony-ws1/output/pose_graph/" # save and load path
+pose_graph_save_path: "/tmp/pose_graph/" # save and load path
 
 #unsynchronization parameters
 estimate_td: 1                      # online estimate time offset between camera and imu

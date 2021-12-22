@@ -21,8 +21,13 @@
 #include "pose_graph.h"
 #include "utility/CameraPoseVisualization.h"
 #include "parameters.h"
+#include <tf/transform_broadcaster.h>
+
+
 #define SKIP_FIRST_CNT 10
 using namespace std;
+
+
 
 queue<sensor_msgs::ImageConstPtr> image_buf;
 queue<sensor_msgs::PointCloudConstPtr> point_buf;
@@ -218,6 +223,22 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     Quaterniond vio_q_cam;
     vio_t_cam = vio_t + vio_q * tic;
     vio_q_cam = vio_q * qic;        
+
+    static tf::TransformBroadcaster myBoadcasterForTest;
+
+    tf::Transform _transform;
+    tf::Quaternion _q;
+    _transform.setOrigin(tf::Vector3(vio_t_cam(0),
+                                    vio_t_cam(1),
+                                    vio_t_cam(2)));
+    _q.setW(vio_q_cam.w());
+    _q.setX(vio_q_cam.x());
+    _q.setY(vio_q_cam.y());
+    _q.setZ(vio_q_cam.z());
+    _transform.setRotation(_q);
+    myBoadcasterForTest.sendTransform(
+        tf::StampedTransform(_transform, pose_msg->header.stamp, 
+        "world", "myCamera"));
 
     if (!VISUALIZE_IMU_FORWARD)
     {
@@ -539,7 +560,6 @@ int main(int argc, char **argv)
     pub_key_odometrys = n.advertise<visualization_msgs::Marker>("key_odometrys", 1000);
     pub_vio_path = n.advertise<nav_msgs::Path>("no_loop_path", 1000);
     pub_match_points = n.advertise<sensor_msgs::PointCloud>("match_points", 100);
-
     std::thread measurement_process;
     std::thread keyboard_command_process;
 
