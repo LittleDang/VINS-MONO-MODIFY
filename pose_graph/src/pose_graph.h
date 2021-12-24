@@ -26,8 +26,8 @@
 
 
 #define SHOW_S_EDGE false
-#define SHOW_L_EDGE true
-#define SAVE_LOOP_PATH true
+#define SHOW_L_EDGE false
+#define SAVE_LOOP_PATH false
 
 using namespace DVision;
 using namespace DBoW2;
@@ -56,7 +56,8 @@ public:
 	Vector3d w_t_vio;
 	Matrix3d w_r_vio;
 
-
+	bool use_pose_graph;
+	void set_pose_graph(bool _use_pose_graph);
 private:
 	int detectLoop(KeyFrame* keyframe, int frame_index);
 	void addKeyFrameIntoVoc(KeyFrame* keyframe);

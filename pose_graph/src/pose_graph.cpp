@@ -5,7 +5,8 @@ PoseGraph::PoseGraph()
     posegraph_visualization = new CameraPoseVisualization(1.0, 0.0, 1.0, 1.0);
     posegraph_visualization->setScale(0.1);
     posegraph_visualization->setLineWidth(0.01);
-	t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
+    use_pose_graph = true;
+    
     earliest_loop_index = -1;
     t_drift = Eigen::Vector3d(0, 0, 0);
     yaw_drift = 0;
@@ -19,9 +20,17 @@ PoseGraph::PoseGraph()
 
 }
 
+void PoseGraph::set_pose_graph(bool _use_pose_graph)
+{
+    use_pose_graph=_use_pose_graph;
+    if(use_pose_graph)
+        t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
+}
+
 PoseGraph::~PoseGraph()
 {
-	t_optimization.join();
+    if(use_pose_graph)
+	    t_optimization.join();
 }
 
 void PoseGraph::registerPub(ros::NodeHandle &n)
@@ -100,6 +109,8 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
             shift_r = Utility::ypr2R(Vector3d(shift_yaw, 0, 0));
             shift_t = w_P_cur - w_R_cur * vio_R_cur.transpose() * vio_P_cur; 
             // shift vio pose of whole sequence to the world frame
+
+
             if (old_kf->sequence != cur_kf->sequence && sequence_loop[cur_kf->sequence] == 0)
             {  
                 w_r_vio = shift_r;
@@ -125,6 +136,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
             m_optimize_buf.lock();
             optimize_buf.push(cur_kf->index);
             m_optimize_buf.unlock();
+            
         }
 	}
 	m_keyframelist.lock();
@@ -203,8 +215,11 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
         }
     }
     //posegraph_visualization->add_pose(P + Vector3d(VISUALIZATION_SHIFT_X, VISUALIZATION_SHIFT_Y, 0), Q);
-
-	keyframelist.push_back(cur_kf);
+    keyframelist.push_back(cur_kf);
+    if(use_pose_graph)
+	    keyframelist.push_back(cur_kf);
+    // else
+    //     delete cur_kf;
     publish();
 	m_keyframelist.unlock();
 }

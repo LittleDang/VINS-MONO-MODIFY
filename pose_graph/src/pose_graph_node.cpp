@@ -27,7 +27,8 @@
 #define SKIP_FIRST_CNT 10
 using namespace std;
 
-
+int max_img_buf_size = 10;
+bool use_pose_graph = true;
 
 queue<sensor_msgs::ImageConstPtr> image_buf;
 queue<sensor_msgs::PointCloudConstPtr> point_buf;
@@ -97,12 +98,22 @@ void new_sequence()
 
 void image_callback(const sensor_msgs::ImageConstPtr &image_msg)
 {
+
     //ROS_INFO("image_callback!");
     if(!LOOP_CLOSURE)
         return;
+
     m_buf.lock();
     image_buf.push(image_msg);
+    if(image_buf.size()>=max_img_buf_size)
+    {
+        if(point_buf.empty() || pose_buf.empty())
+            image_buf.pop();
+    }
     m_buf.unlock();
+
+
+    //ROS_INFO("receive image.buf size:%ld",image_buf.size());
     //printf(" image time %f \n", image_msg->header.stamp.toSec());
 
     // detect unstable camera stream
@@ -172,6 +183,7 @@ void imu_forward_callback(const nav_msgs::Odometry::ConstPtr &forward_msg)
         vio_t = posegraph.r_drift * vio_t + posegraph.t_drift;
         vio_q = posegraph.r_drift * vio_q;
 
+
         Vector3d vio_t_cam;
         Quaterniond vio_q_cam;
         vio_t_cam = vio_t + vio_q * tic;
@@ -199,7 +211,8 @@ void relo_relative_pose_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     loop_info << relative_t.x(), relative_t.y(), relative_t.z(),
                  relative_q.w(), relative_q.x(), relative_q.y(), relative_q.z(),
                  relative_yaw;
-    posegraph.updateKeyFrameLoop(index, loop_info);
+    if(use_pose_graph)
+        posegraph.updateKeyFrameLoop(index, loop_info);
 
 }
 
@@ -347,13 +360,18 @@ void process()
                     image_buf.pop();
                 image_msg = image_buf.front();
                 image_buf.pop();
-
+                while( image_buf.size()>=max_img_buf_size)
+                {
+                    image_buf.pop();
+                }
+                //ROS_INFO("deal with image.buf size:%ld",image_buf.size());
                 while (point_buf.front()->header.stamp.toSec() < pose_msg->header.stamp.toSec())
                     point_buf.pop();
                 point_msg = point_buf.front();
                 point_buf.pop();
             }
         }
+        
         m_buf.unlock();
 
         if (pose_msg != NULL)
@@ -368,7 +386,7 @@ void process()
                 continue;
             }
 
-            if (skip_cnt < SKIP_CNT)
+            if ( skip_cnt < SKIP_CNT)
             {
                 skip_cnt++;
                 continue;
@@ -403,7 +421,7 @@ void process()
                                      pose_msg->pose.pose.orientation.x,
                                      pose_msg->pose.pose.orientation.y,
                                      pose_msg->pose.pose.orientation.z).toRotationMatrix();
-            if((T - last_t).norm() > SKIP_DIS)
+            if( (T - last_t).norm() > SKIP_DIS)
             {
                 vector<cv::Point3f> point_3d; 
                 vector<cv::Point2f> point_2d_uv; 
@@ -477,12 +495,14 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "pose_graph");
     ros::NodeHandle n("~");
     posegraph.registerPub(n);
-
     // read param
     n.getParam("visualization_shift_x", VISUALIZATION_SHIFT_X);
     n.getParam("visualization_shift_y", VISUALIZATION_SHIFT_Y);
     n.getParam("skip_cnt", SKIP_CNT);
     n.getParam("skip_dis", SKIP_DIS);
+    n.getParam("max_img_buf_size",max_img_buf_size);
+    n.getParam("use_pose_graph",use_pose_graph);
+    posegraph.set_pose_graph(use_pose_graph);
     std::string config_file;
     n.getParam("config_file", config_file);
     cv::FileStorage fsSettings(config_file, cv::FileStorage::READ);

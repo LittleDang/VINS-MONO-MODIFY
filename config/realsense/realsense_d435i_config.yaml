@@ -74,8 +74,8 @@ g_norm: 9.805        # gravity magnitude
 #loop closure parameters
 loop_closure: 1                    # start loop closure
 fast_relocalization: 1             # useful in real-time and large project
-load_previous_pose_graph: 0        # load and reuse previous pose graph; load from 'pose_graph_save_path'
-pose_graph_save_path: "/home/tony-ws1/output/pose_graph/" # save and load path
+load_previous_pose_graph: 1        # load and reuse previous pose graph; load from 'pose_graph_save_path'
+pose_graph_save_path: "/home/esac/vins-MONO-map/509/" # save and load path
 
 #unsynchronization parameters
 estimate_td: 0                      # online estimate time offset between camera and imu
