@@ -200,7 +200,8 @@ void KeyFrame::FundmantalMatrixRANSAC(const std::vector<cv::Point2f> &matched_2d
 void KeyFrame::PnPRANSAC(const vector<cv::Point2f> &matched_2d_old_norm,
                          const std::vector<cv::Point3f> &matched_3d,
                          std::vector<uchar> &status,
-                         Eigen::Vector3d &PnP_T_old, Eigen::Matrix3d &PnP_R_old)
+                         Eigen::Vector3d &PnP_T_old, Eigen::Matrix3d &PnP_R_old,
+						 bool use_pose_graph)
 {
 	//for (int i = 0; i < matched_3d.size(); i++)
 	//	printf("3d x: %f, y: %f, z: %f\n",matched_3d[i].x, matched_3d[i].y, matched_3d[i].z );
@@ -222,14 +223,18 @@ void KeyFrame::PnPRANSAC(const vector<cv::Point2f> &matched_2d_old_norm,
     cv::Mat inliers;
     TicToc t_pnp_ransac;
 
+	double reproject_error = 10.0;
+	if(!use_pose_graph)
+		reproject_error = 10.0;
+
     if (CV_MAJOR_VERSION < 3)
-        solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, 10.0 / 460.0, 100, inliers);
+        solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, reproject_error / 460.0, 100, inliers);
     else
     {
         if (CV_MINOR_VERSION < 2)
-            solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, sqrt(10.0 / 460.0), 0.99, inliers);
+            solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, sqrt(reproject_error / 460.0), 0.99, inliers);
         else
-            solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, 10.0 / 460.0, 0.99, inliers);
+            solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, reproject_error / 460.0, 0.99, inliers);
 
     }
 
@@ -256,7 +261,7 @@ void KeyFrame::PnPRANSAC(const vector<cv::Point2f> &matched_2d_old_norm,
 }
 
 
-bool KeyFrame::findConnection(KeyFrame* old_kf)
+bool KeyFrame::findConnection(KeyFrame* old_kf , bool use_pose_graph)
 {
 	TicToc tmp_t;
 	//printf("find Connection\n");
@@ -406,7 +411,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
 	{
 		status.clear();
-	    PnPRANSAC(matched_2d_old_norm, matched_3d, status, PnP_T_old, PnP_R_old);
+	    PnPRANSAC(matched_2d_old_norm, matched_3d, status, PnP_T_old, PnP_R_old,use_pose_graph);
 	    reduceVector(matched_2d_cur, status);
 	    reduceVector(matched_2d_old, status);
 	    reduceVector(matched_2d_cur_norm, status);
@@ -477,7 +482,15 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	    //printf("PNP relative\n");
 	    //cout << "pnp relative_t " << relative_t.transpose() << endl;
 	    //cout << "pnp relative_yaw " << relative_yaw << endl;
-	    if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0)
+		double max_relative_yaw = 30.0;
+		double max_relative_t = 20.0;
+		if(!use_pose_graph)
+		{
+			// max_relative_t = 1;
+			// max_relative_yaw = 30.0;
+		}
+	    if (abs(relative_yaw) < max_relative_yaw && 
+			relative_t.norm() < max_relative_t)
 	    {
 
 	    	has_loop = true;

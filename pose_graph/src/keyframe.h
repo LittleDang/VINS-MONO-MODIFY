@@ -38,7 +38,7 @@ public:
 	KeyFrame(double _time_stamp, int _index, Vector3d &_vio_T_w_i, Matrix3d &_vio_R_w_i, Vector3d &_T_w_i, Matrix3d &_R_w_i,
 			 cv::Mat &_image, int _loop_index, Eigen::Matrix<double, 8, 1 > &_loop_info,
 			 vector<cv::KeyPoint> &_keypoints, vector<cv::KeyPoint> &_keypoints_norm, vector<BRIEF::bitset> &_brief_descriptors);
-	bool findConnection(KeyFrame* old_kf);
+	bool findConnection(KeyFrame* old_kf , bool use_pose_graph);
 	void computeWindowBRIEFPoint();
 	void computeBRIEFPoint();
 	//void extractBrief();
@@ -61,7 +61,8 @@ public:
 	void PnPRANSAC(const vector<cv::Point2f> &matched_2d_old_norm,
 	               const std::vector<cv::Point3f> &matched_3d,
 	               std::vector<uchar> &status,
-	               Eigen::Vector3d &PnP_T_old, Eigen::Matrix3d &PnP_R_old);
+	               Eigen::Vector3d &PnP_T_old, Eigen::Matrix3d &PnP_R_old,
+				   bool use_pose_graph);
 	void getVioPose(Eigen::Vector3d &_T_w_i, Eigen::Matrix3d &_R_w_i);
 	void getPose(Eigen::Vector3d &_T_w_i, Eigen::Matrix3d &_R_w_i);
 	void updatePose(const Eigen::Vector3d &_T_w_i, const Eigen::Matrix3d &_R_w_i);
