@@ -29,6 +29,8 @@ using namespace std;
 
 int max_img_buf_size = 10;
 bool use_pose_graph = true;
+int min_optimize_frames_size = 20;
+
 
 queue<sensor_msgs::ImageConstPtr> image_buf;
 queue<sensor_msgs::PointCloudConstPtr> point_buf;
@@ -502,6 +504,8 @@ int main(int argc, char **argv)
     n.getParam("skip_dis", SKIP_DIS);
     n.getParam("max_img_buf_size",max_img_buf_size);
     n.getParam("use_pose_graph",use_pose_graph);
+    n.getParam("min_optimize_frames_size", min_optimize_frames_size);
+    posegraph.set_min_optimize_frames_size(min_optimize_frames_size);
     posegraph.set_pose_graph(use_pose_graph);
     std::string config_file;
     n.getParam("config_file", config_file);

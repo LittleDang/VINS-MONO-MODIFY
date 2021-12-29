@@ -17,28 +17,26 @@ PoseGraph::PoseGraph()
     sequence_cnt = 0;
     sequence_loop.push_back(0);
     base_sequence = 1;
-
-    max_window_size = 20;
+    global_map_frames_size = -1;
 }
 
 void PoseGraph::set_pose_graph(bool _use_pose_graph)
 {
     use_pose_graph = _use_pose_graph;
     ROS_INFO("use_pose_graph:%s" , use_pose_graph ? "true" : "false");
-    if(use_pose_graph)
+    //if(use_pose_graph)
         t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
 }
 
-void PoseGraph::set_max_window_size(int _max_window_size)
+void PoseGraph::set_min_optimize_frames_size(int _min_optimize_frames_size)
 {
-    if(use_pose_graph)
-        return;
-    max_window_size = _max_window_size;
+    min_optimize_frames_size = _min_optimize_frames_size;
 }
+
 
 PoseGraph::~PoseGraph()
 {
-    if(use_pose_graph)
+    //if(use_pose_graph)
 	    t_optimization.join();
 }
 
@@ -79,7 +77,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
     }
     else
     {
-        //if (sequence_cnt != cur_kf->sequence)//如果只要一帧的话，就注释掉就完事了
+        if (sequence_cnt != cur_kf->sequence)//如果只要一帧的话，就注释掉就完事了
         {
             sequence_cnt = 1;
             if(sequence_loop.size() != 2)
@@ -98,8 +96,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
     vio_R_cur = w_r_vio *  vio_R_cur;
     cur_kf->updateVioPose(vio_P_cur, vio_R_cur);
     cur_kf->index = global_index;
-    if (global_index <= max_window_size)
-        global_index++;
+    global_index++;
     
 	int loop_index = -1;
     if (flag_detect_loop)
@@ -167,10 +164,10 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
                         (*it)->updateVioPose(vio_P_cur, vio_R_cur);
                     }
                 }
-                if(use_pose_graph)
-                    sequence_loop[cur_kf->sequence] = 1;
+                //if(use_pose_graph)
+                sequence_loop[cur_kf->sequence] = 1;
             }
-            if(use_pose_graph)
+            //if(use_pose_graph)
             {
                 m_optimize_buf.lock();
                 optimize_buf.push(cur_kf->index);
@@ -182,7 +179,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
 	m_keyframelist.lock();
     
 
-    if(use_pose_graph)
+    //if(use_pose_graph)
     {
         Vector3d P;
         Matrix3d R;
@@ -261,8 +258,10 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
         keyframelist.push_back(cur_kf);
         publish();
     } 
-    else
-        delete cur_kf;
+    //else
+    //{
+    //    delete cur_kf;
+    //}
 	m_keyframelist.unlock();
 }
 
@@ -462,15 +461,24 @@ void PoseGraph::optimize4DoF()
 {
     while(true)
     {
+        if(keyframelist.size() - global_map_frames_size< min_optimize_frames_size)
+        {
+            std::chrono::milliseconds dura(100);
+            std::this_thread::sleep_for(dura);
+            continue;
+        }
         int cur_index = -1;
         int first_looped_index = -1;
         m_optimize_buf.lock();
+        bool has_optimize = false;
         while(!optimize_buf.empty())
         {
             cur_index = optimize_buf.front();
             first_looped_index = earliest_loop_index;
             optimize_buf.pop();
+            has_optimize = true; 
         }
+        ROS_INFO("cur_index=%d, keyframe lise size=%ld",cur_index,keyframelist.size());
         m_optimize_buf.unlock();
         if (cur_index != -1)
         {
@@ -479,8 +487,11 @@ void PoseGraph::optimize4DoF()
             m_keyframelist.lock();
             KeyFrame* cur_kf = getKeyFrame(cur_index);
 
-            int max_length = cur_index + 1;
-
+            int max_length;
+            if(use_pose_graph)
+                max_length = cur_index + 1;
+            else
+                max_length = keyframelist.size();
             // w^t_i   w^q_i
             double t_array[max_length][3];
             Quaterniond q_array[max_length];
@@ -533,7 +544,14 @@ void PoseGraph::optimize4DoF()
                     problem.SetParameterBlockConstant(euler_array[i]);
                     problem.SetParameterBlockConstant(t_array[i]);
                 }
-
+                if(!use_pose_graph)
+                {
+                    if((*it)->index < global_map_frames_size)
+                    {
+                        problem.SetParameterBlockConstant(euler_array[i]);
+                        problem.SetParameterBlockConstant(t_array[i]);
+                    }   
+                }
                 //add edge
                 for (int j = 1; j < 5; j++)
                 {
@@ -587,6 +605,7 @@ void PoseGraph::optimize4DoF()
                 printf("optimize i: %d p: %f, %f, %f\n", j, t_array[j][0], t_array[j][1], t_array[j][2] );
             }
             */
+            ROS_INFO("1");
             m_keyframelist.lock();
             i = 0;
             for (it = keyframelist.begin(); it != keyframelist.end(); it++)
@@ -631,7 +650,29 @@ void PoseGraph::optimize4DoF()
             updatePath();
         }
 
-        std::chrono::milliseconds dura(2000);
+       
+        m_global_map_frames_size.lock();
+        if(!use_pose_graph && global_map_frames_size != -1 && has_optimize)
+        {
+            ROS_INFO("PG complete!keyframe list size = %ld",keyframelist.size());
+            m_keyframelist.lock();
+            int tmp_cnt = 0;
+            for(auto b = keyframelist.begin(); b != keyframelist.end(); b++)
+            {
+                tmp_cnt++;
+                if(tmp_cnt > global_map_frames_size)
+                    delete (*b);
+            }
+            keyframelist.erase(std::next(keyframelist.begin(), global_map_frames_size) , keyframelist.end());
+            m_keyframelist.unlock();
+
+            m_optimize_buf.lock();
+            while(!optimize_buf.empty())
+                optimize_buf.pop();
+            m_optimize_buf.unlock();
+        }
+        m_global_map_frames_size.unlock();
+        std::chrono::milliseconds dura(100);
         std::this_thread::sleep_for(dura);
     }
 }
@@ -809,6 +850,7 @@ void PoseGraph::savePoseGraph()
 }
 void PoseGraph::loadPoseGraph()
 {
+    m_global_map_frames_size.lock();
     TicToc tmp_t;
     FILE * pFile;
     string file_path = POSE_GRAPH_SAVE_PATH + "pose_graph.txt";
@@ -925,6 +967,9 @@ void PoseGraph::loadPoseGraph()
     fclose (pFile);
     printf("load pose graph time: %f s\n", tmp_t.toc()/1000);
     base_sequence = 0;
+    if(!use_pose_graph)
+        global_map_frames_size = global_index;
+    m_global_map_frames_size.unlock();
 }
 
 void PoseGraph::publish()

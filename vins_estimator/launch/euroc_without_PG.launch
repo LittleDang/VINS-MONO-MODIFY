@@ -20,6 +20,7 @@
         <param name="skip_dis" type="double" value="0.1" />
         <param name="max_img_buf_size" type="int" value="10" />
         <param name="use_pose_graph" type="bool" value="false" />
+        <param name="min_optimize_frames_size" type="int" value="20" />
 
     </node>
 

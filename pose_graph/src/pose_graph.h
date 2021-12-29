@@ -58,9 +58,11 @@ public:
 
 	bool use_pose_graph;
 	void set_pose_graph(bool _use_pose_graph);
+	int global_map_frames_size;
+	std::mutex m_global_map_frames_size;
 
-	int max_window_size;
-	void set_max_window_size(int _max_window_size);
+	int min_optimize_frames_size;
+	void set_min_optimize_frames_size(int _min_optimize_frames_size);
 private:
 	int detectLoop(KeyFrame* keyframe, int frame_index);
 	void addKeyFrameIntoVoc(KeyFrame* keyframe);
