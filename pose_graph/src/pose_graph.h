@@ -58,6 +58,9 @@ public:
 
 	bool use_pose_graph;
 	void set_pose_graph(bool _use_pose_graph);
+
+	int max_window_size;
+	void set_max_window_size(int _max_window_size);
 private:
 	int detectLoop(KeyFrame* keyframe, int frame_index);
 	void addKeyFrameIntoVoc(KeyFrame* keyframe);

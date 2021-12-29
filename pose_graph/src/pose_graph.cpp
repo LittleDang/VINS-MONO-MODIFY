@@ -18,14 +18,22 @@ PoseGraph::PoseGraph()
     sequence_loop.push_back(0);
     base_sequence = 1;
 
+    max_window_size = 20;
 }
 
 void PoseGraph::set_pose_graph(bool _use_pose_graph)
 {
     use_pose_graph = _use_pose_graph;
-    ROS_INFO("use_pose_graph:%s" , use_pose_graph ? "true":"false");
+    ROS_INFO("use_pose_graph:%s" , use_pose_graph ? "true" : "false");
     if(use_pose_graph)
         t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
+}
+
+void PoseGraph::set_max_window_size(int _max_window_size)
+{
+    if(use_pose_graph)
+        return;
+    max_window_size = _max_window_size;
 }
 
 PoseGraph::~PoseGraph()
@@ -55,24 +63,44 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
     //shift to base frame
     Vector3d vio_P_cur;
     Matrix3d vio_R_cur;
-    if (sequence_cnt != cur_kf->sequence)
+    if(use_pose_graph)
     {
-        sequence_cnt++;
-        sequence_loop.push_back(0);
-        w_t_vio = Eigen::Vector3d(0, 0, 0);
-        w_r_vio = Eigen::Matrix3d::Identity();
-        m_drift.lock();
-        t_drift = Eigen::Vector3d(0, 0, 0);
-        r_drift = Eigen::Matrix3d::Identity();
-        m_drift.unlock();
+        if (sequence_cnt != cur_kf->sequence)
+        {
+            sequence_cnt++;
+            sequence_loop.push_back(0);
+            w_t_vio = Eigen::Vector3d(0, 0, 0);
+            w_r_vio = Eigen::Matrix3d::Identity();
+            m_drift.lock();
+            t_drift = Eigen::Vector3d(0, 0, 0);
+            r_drift = Eigen::Matrix3d::Identity();
+            m_drift.unlock();
+        }
     }
-    
+    else
+    {
+        //if (sequence_cnt != cur_kf->sequence)//如果只要一帧的话，就注释掉就完事了
+        {
+            sequence_cnt = 1;
+            if(sequence_loop.size() != 2)
+                sequence_loop.push_back(0);
+            w_t_vio = Eigen::Vector3d(0, 0, 0);
+            w_r_vio = Eigen::Matrix3d::Identity();
+            m_drift.lock();
+            t_drift = Eigen::Vector3d(0, 0, 0);
+            r_drift = Eigen::Matrix3d::Identity();
+            m_drift.unlock();
+        }
+    }
+
     cur_kf->getVioPose(vio_P_cur, vio_R_cur);
     vio_P_cur = w_r_vio * vio_P_cur + w_t_vio;
     vio_R_cur = w_r_vio *  vio_R_cur;
     cur_kf->updateVioPose(vio_P_cur, vio_R_cur);
     cur_kf->index = global_index;
-    global_index++;
+    if (global_index <= max_window_size)
+        global_index++;
+    
 	int loop_index = -1;
     if (flag_detect_loop)
     {
@@ -84,6 +112,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
         if(use_pose_graph)
             addKeyFrameIntoVoc(cur_kf);
     }
+
 	if (loop_index != -1)
 	{
         //printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
@@ -349,7 +378,7 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
     //cout << "Searching for Image " << frame_index << ". " << ret << endl;
 
     TicToc t_add;
-    //if(use_pose_graph)
+    if(use_pose_graph)
         db.add(keyframe->brief_descriptors);
     //printf("add feature time: %f", t_add.toc());
     // ret[0] is the nearest neighbour's score. threshold change with neighour score
