@@ -1,5 +1,5 @@
 <launch>
-    <arg name="config_path" default = "$(find feature_tracker)/../config/realsense/realsense_d435i_config.yaml" />
+    <arg name="config_path" default = "$(find feature_tracker)/../config/realsense/realsense_d435i_config_without_PG.yaml" />
 	  <arg name="vins_path" default = "$(find feature_tracker)/../config/../" />
     
     <node name="feature_tracker" pkg="feature_tracker" type="feature_tracker" output="log">
@@ -17,10 +17,10 @@
         <param name="visualization_shift_x" type="int" value="0" />
         <param name="visualization_shift_y" type="int" value="0" />
         <param name="skip_cnt" type="int" value="0" />
-        <param name="skip_dis" type="double" value="0.1" />
+        <param name="skip_dis" type="double" value="0.05" />
         <param name="max_img_buf_size" type="int" value="10" />
         <param name="use_pose_graph" type="bool" value="false" />
-        <param name="min_optimize_frames_size" type="int" value="20" />
+        <param name="min_optimize_frames_size" type="int" value="100" />
 
     </node>
 

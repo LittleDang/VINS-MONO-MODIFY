@@ -461,12 +461,6 @@ void PoseGraph::optimize4DoF()
 {
     while(true)
     {
-        if(keyframelist.size() - global_map_frames_size< min_optimize_frames_size)
-        {
-            std::chrono::milliseconds dura(100);
-            std::this_thread::sleep_for(dura);
-            continue;
-        }
         int cur_index = -1;
         int first_looped_index = -1;
         m_optimize_buf.lock();
@@ -478,7 +472,7 @@ void PoseGraph::optimize4DoF()
             optimize_buf.pop();
             has_optimize = true; 
         }
-        ROS_INFO("cur_index=%d, keyframe lise size=%ld",cur_index,keyframelist.size());
+        //ROS_INFO("cur_index=%d, keyframe lise size=%ld",cur_index,keyframelist.size());
         m_optimize_buf.unlock();
         if (cur_index != -1)
         {
@@ -605,7 +599,6 @@ void PoseGraph::optimize4DoF()
                 printf("optimize i: %d p: %f, %f, %f\n", j, t_array[j][0], t_array[j][1], t_array[j][2] );
             }
             */
-            ROS_INFO("1");
             m_keyframelist.lock();
             i = 0;
             for (it = keyframelist.begin(); it != keyframelist.end(); it++)
@@ -652,24 +645,30 @@ void PoseGraph::optimize4DoF()
 
        
         m_global_map_frames_size.lock();
-        if(!use_pose_graph && global_map_frames_size != -1 && has_optimize)
+        if(keyframelist.size() - global_map_frames_size> min_optimize_frames_size)
         {
-            ROS_INFO("PG complete!keyframe list size = %ld",keyframelist.size());
-            m_keyframelist.lock();
-            int tmp_cnt = 0;
-            for(auto b = keyframelist.begin(); b != keyframelist.end(); b++)
+            if(!use_pose_graph && global_map_frames_size != -1 && has_optimize)
             {
-                tmp_cnt++;
-                if(tmp_cnt > global_map_frames_size)
-                    delete (*b);
-            }
-            keyframelist.erase(std::next(keyframelist.begin(), global_map_frames_size) , keyframelist.end());
-            m_keyframelist.unlock();
+                ROS_INFO("PG complete!keyframe list size = %ld",keyframelist.size());
+                m_keyframelist.lock();
+                int tmp_cnt = 0;
+                for(auto b = keyframelist.begin(); b != keyframelist.end(); b++)
+                {
+                    tmp_cnt++;
+                    if(tmp_cnt > global_map_frames_size &&
+                        tmp_cnt <= keyframelist.size() - min_optimize_frames_size)
+                        delete (*b);
+                }
+                keyframelist.erase(std::next(keyframelist.begin(), global_map_frames_size) 
+                , std::next(keyframelist.begin(), keyframelist.size() - min_optimize_frames_size));
 
-            m_optimize_buf.lock();
-            while(!optimize_buf.empty())
-                optimize_buf.pop();
-            m_optimize_buf.unlock();
+                m_keyframelist.unlock();
+
+                m_optimize_buf.lock();
+                while(!optimize_buf.empty())
+                    optimize_buf.pop();
+                m_optimize_buf.unlock();
+            }
         }
         m_global_map_frames_size.unlock();
         std::chrono::milliseconds dura(100);

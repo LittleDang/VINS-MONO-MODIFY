@@ -250,10 +250,11 @@ void vio_callback(const nav_msgs::Odometry::ConstPtr &pose_msg)
     _q.setX(vio_q_cam.x());
     _q.setY(vio_q_cam.y());
     _q.setZ(vio_q_cam.z());
+    _q = _q*tf::createQuaternionFromRPY(-1.571, -0.000, -1.571).inverse();
     _transform.setRotation(_q);
     myBoadcasterForTest.sendTransform(
         tf::StampedTransform(_transform, pose_msg->header.stamp, 
-        "world", "myCamera"));
+        "world", "camera_link"));
 
     if (!VISUALIZE_IMU_FORWARD)
     {
