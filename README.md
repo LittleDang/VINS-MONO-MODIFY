@@ -26,6 +26,13 @@
 2. VINS-MONO本身是对静态环境的系统，所以实际运行过程中，如果视觉前端给出了一个比较差的数据的时候，系统也及其容易崩溃。eg,在相机面前晃一晃2s。
 3. 不是很建议使用VINS-MONO自动标定外参数的代码，这是因为其自动标定外参数的过程中，仅仅计算出了姿态，而相对的位移直接设置为0。尽管如此，系统在有些时候还是能稳定运行，我猜测是因为我所使用的相机的realsense-d435i,本身IMU和camera之间的距离比较小，所以带来的误差比较小。虽然我尝试过使用[kalibar](https://github.com/ethz-asl/kalibr)标定，但是效果感觉不如`realsense-d435i`驱动里面自带的默认参数。
 
+## 一些学习VINS-MONO的过程
+
+1. 关于论文的理解[vins-mono论文阅读.pdf](学习笔记/vins-mono论文阅读.pdf)
+2. 读优化模块对应的factor的笔记，主要有两个，一个是IMU的factor，这部分和论文差不多，只不过是将欧拉积分换成了mid-point，形式上确实是复杂了很多。projection部分看这个[projection_factor.pdf](学习笔记/projection_factor.pdf)
+3. 初始化部分，[初始化.pdf](学习笔记/初始化.pdf)
+4. 边缘化，这个其实我尽量花时间去理解了，但是还是有一些细节有待考究,[边缘化.pdf](学习笔记/边缘化.pdf)
+
 ## A Robust and Versatile Monocular Visual-Inertial State Estimator
 
 **11 Jan 2019**: An extension of **VINS**, which supports stereo cameras / stereo cameras + IMU / mono camera + IMU, is published at [VINS-Fusion](https://github.com/HKUST-Aerial-Robotics/VINS-Fusion)
