@@ -1,4 +1,31 @@
 # VINS-Mono
+## 关于我对这个项目的修改
+
+1. 原本的VINS-MONO的`pose_graph`进程，占用的内存十分夸张。该问题在[issue258](https://github.com/HKUST-Aerial-Robotics/VINS-Mono/issues/258)里面有相关讨论，但是没有人给出原因和解决方案。经过对代码的阅读和整理，发现该进程在收到`vins_estimator`存在很多情况下在前端数据没有更新发送给后端之前，会将期间的数据缓存起来，导致VINS-MONO在初始化之前，或者静置不动的时候，内存也会有较大的消耗。**该问题目前已经在代码里面解决了。**
+
+2. 由于该项目最终运行的效果是要对比gmapping+amcl的效果，VINS-MONO自身是允许保存地图和自动载入上一次的地图的功能的，但是遇到了以下的问题，必须解决：
+
+   1. VINS-MONO的`pose_graph`进程在每一次添加关键帧的时候，内存占用都会增加。这是不好的，因为在使用过程中，哪怕在同一个房间里面运行的足够久，内存也会逐渐增长到无法使用的程度。
+   2. 我希望在第一次认真的手工建图结束之后，一直使用该地图即可，并不想要在之后的使用过程中，不断的优化之前的地图。这是因为在多次的使用过程中，极有可能会引入一些效果较差的数据，导致第一次建的比较好的图受到影响。哪怕我们之后不再保存新的数据，永远使用第一次的数据，至少在当前引入误差较大的数据的时候，会导致较差的定位效果。基于上述原因，我希望在有地图的情况下，不再更新原本的地图。
+   3. 我想得到后端输出的定位数据，接入ROS系统使用，原本的代码并没有发送world到camera的tf，这个比较简单，找到相关代码，手动补上就好了。
+   4. 虽然我不再更新原本的地图，但是我还是尽可能的希望得到一个平滑的定位效果，所以后端的优化线程还是必须运行。
+
+   关于以上的问题，我最终使用了如下的解决方案：
+
+   1. 载入地图的时候，将地图的帧数记录好，在优化的时候，将对应的变量设置为常量即可。这样可以保证之前的地图不被优化。
+   2. 为了足够平滑，采用了一个类似滑动窗口的策略，即将最新的N帧里面的顺序边和回环边加入优化图，将旧的部分删除。可以得到一个平滑的定位效果，如果仅仅使用一帧，会导致效果定位效果极不稳定。
+   3. 在使用了以上的策略之后，我依然发现内存还是会缓慢的增长。仔细跟踪之后，发现是每一帧关键帧都会放进DBOW的database里面，修改一下即可。
+
+   **以上这些问题目前已经在代码里面解决了**
+
+   **对应的修改部分可以看看commit记录，代码量改动其实不是很多。**
+
+## 关于我对这个项目的调试过程遇到的问题
+
+1. 如果将IMU的置信度设置的比较高，系统将及其容易崩溃，主要问题我猜应该是不管怎么优化，IMU的漂移还是存在，当其置信度较高的时候，在优化的时候容易跳出局部最优值，进入一个比较差的位置。
+2. VINS-MONO本身是对静态环境的系统，所以实际运行过程中，如果视觉前端给出了一个比较差的数据的时候，系统也及其容易崩溃。eg,在相机面前晃一晃2s。
+3. 不是很建议使用VINS-MONO自动标定外参数的代码，这是因为其自动标定外参数的过程中，仅仅计算出了姿态，而相对的位移直接设置为0。尽管如此，系统在有些时候还是能稳定运行，我猜测是因为我所使用的相机的realsense-d435i,本身IMU和camera之间的距离比较小，所以带来的误差比较小。虽然我尝试过使用[kalibar](https://github.com/ethz-asl/kalibr)标定，但是效果感觉不如`realsense-d435i`驱动里面自带的默认参数。
+
 ## A Robust and Versatile Monocular Visual-Inertial State Estimator
 
 **11 Jan 2019**: An extension of **VINS**, which supports stereo cameras / stereo cameras + IMU / mono camera + IMU, is published at [VINS-Fusion](https://github.com/HKUST-Aerial-Robotics/VINS-Fusion)
@@ -82,7 +109,7 @@ Download [EuRoC MAV Dataset](http://projects.asl.ethz.ch/datasets/doku.php?id=km
     roslaunch benchmark_publisher publish.launch  sequence_name:=MH_05_difficult
 ```
  (Green line is VINS result, red line is ground truth). 
- 
+
 3.1.3 (Optional) You can even run EuRoC **without extrinsic parameters** between camera and IMU. We will calibrate them online. Replace the first command with:
 ```
     roslaunch vins_estimator euroc_no_extrinsic_param.launch
